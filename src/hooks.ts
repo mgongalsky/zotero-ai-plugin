@@ -90,7 +90,8 @@ async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
   });
   popupWin.startCloseTimer(5000);
 
-  addon.hooks.onDialogEvents("dialogExample");
+  // Dialog example can be triggered from right-click menu
+  // addon.hooks.onDialogEvents("dialogExample");
 }
 
 async function onMainWindowUnload(win: Window): Promise<void> {
@@ -117,16 +118,21 @@ async function onNotify(
   ids: Array<string | number>,
   extraData: { [key: string]: any },
 ) {
-  // You can add your code to the corresponding notify type
-  ztoolkit.log("notify", event, type, ids, extraData);
-  if (
-    event == "select" &&
-    type == "tab" &&
-    extraData[ids[0]].type == "reader"
-  ) {
-    BasicExampleFactory.exampleNotifierCallback();
-  } else {
-    return;
+  try {
+    // You can add your code to the corresponding notify type
+    ztoolkit.log("notify", event, type, ids, extraData);
+    if (
+      event === "select" &&
+      type === "tab" &&
+      ids.length > 0 &&
+      extraData &&
+      extraData[ids[0]] &&
+      extraData[ids[0]].type === "reader"
+    ) {
+      BasicExampleFactory.exampleNotifierCallback();
+    }
+  } catch (e) {
+    ztoolkit.log("Error in onNotify:", e);
   }
 }
 

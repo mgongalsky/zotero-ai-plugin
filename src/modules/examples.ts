@@ -12,7 +12,9 @@ function example(
       return original.apply(this, args);
     } catch (e) {
       ztoolkit.log(`Error in example ${target.name}.${String(propertyKey)}`, e);
-      throw e;
+      // Don't rethrow to prevent breaking the plugin
+      console.error(`Plugin example error in ${target.name}.${String(propertyKey)}:`, e);
+      return undefined;
     }
   };
   return descriptor;
@@ -124,16 +126,23 @@ export class KeyExampleFactory {
 export class UIExampleFactory {
   @example
   static registerStyleSheet(win: _ZoteroTypes.MainWindow) {
-    const doc = win.document;
-    const styles = ztoolkit.UI.createElement(doc, "link", {
-      properties: {
-        type: "text/css",
-        rel: "stylesheet",
-        href: `chrome://${addon.data.config.addonRef}/content/zoteroPane.css`,
-      },
-    });
-    doc.documentElement?.appendChild(styles);
-    doc.getElementById("zotero-item-pane-content")?.classList.add("makeItRed");
+    try {
+      const doc = win.document;
+      const styles = ztoolkit.UI.createElement(doc, "link", {
+        properties: {
+          type: "text/css",
+          rel: "stylesheet",
+          href: `chrome://${addon.data.config.addonRef}/content/zoteroPane.css`,
+        },
+      });
+      doc.documentElement?.appendChild(styles);
+      const itemPane = doc.getElementById("zotero-item-pane-content");
+      if (itemPane) {
+        itemPane.classList.add("makeItRed");
+      }
+    } catch (e) {
+      ztoolkit.log("Error registering stylesheet:", e);
+    }
   }
 
   @example
@@ -142,7 +151,7 @@ export class UIExampleFactory {
     // item menuitem with icon
     ztoolkit.Menu.register("item", {
       tag: "menuitem",
-      id: "zotero-itemmenu-addontemplate-test",
+      id: "zotero-itemmenu-zoteroai-test",
       label: getString("menuitem-label"),
       commandListener: (ev) => addon.hooks.onDialogEvents("dialogExample"),
       icon: menuIcon,
@@ -166,7 +175,7 @@ export class UIExampleFactory {
       },
       "before",
       win.document?.querySelector(
-        "#zotero-itemmenu-addontemplate-test",
+        "#zotero-itemmenu-zoteroai-test",
       ) as XUL.MenuItem,
     );
   }
@@ -812,10 +821,12 @@ export class HelperExampleFactory {
     addon.data.dialog = dialogHelper;
     await dialogData.unloadLock.promise;
     addon.data.dialog = undefined;
-    if (addon.data.alive)
+    if (addon.data.alive) {
+      const buttonId = dialogData._lastButtonId || "undefined";
       ztoolkit.getGlobal("alert")(
-        `Close dialog with ${dialogData._lastButtonId}.\nCheckbox: ${dialogData.checkboxValue}\nInput: ${dialogData.inputValue}.`,
+        `Close dialog with ${buttonId}.\nCheckbox: ${dialogData.checkboxValue}\nInput: ${dialogData.inputValue}.`,
       );
+    }
     ztoolkit.log(dialogData);
   }
 
