@@ -171,6 +171,7 @@ export class AIModule {
       dialogHelper = new ztoolkit.Dialog(12, 2)
         .addCell(0, 0, {
           tag: "h2",
+          namespace: "html",
           properties: { innerHTML: "🤖 Zotero AI Assistant" },
           styles: { textAlign: "center", color: "#1a73e8", marginBottom: "6px" },
         })
@@ -242,22 +243,181 @@ export class AIModule {
    */
   static unregisterAIButton() {
     try {
-      ztoolkit.log("Attempting to remove AI button");
-      
+      ztoolkit.log("Attempting to remove AI buttons");
       const doc = ztoolkit.getGlobal("window")?.document;
-      if (doc) {
-        const button = doc.getElementById("zotero-ai-toolbar-button");
-        if (button) {
-          button.remove();
-          ztoolkit.log("AI toolbar button removed successfully");
-        } else {
-          ztoolkit.log("AI button not found for removal");
-        }
-      } else {
-        ztoolkit.log("Document not available for button removal");
-      }
+      if (!doc) return;
+      ["zotero-ai-toolbar-button", "zotero-ai-summary-button"].forEach((id) => {
+        const btn = doc.getElementById(id);
+        if (btn) (btn as any).remove();
+      });
     } catch (e) {
-      ztoolkit.log("Error removing AI button:", e);
+      ztoolkit.log("Error removing AI buttons:", e);
+    }
+  }
+
+  /**
+   * Register secondary toolbar button for summary
+   */
+  static registerSummaryButton() {
+    try {
+      const doc = ztoolkit.getGlobal("window").document;
+      const existing = doc.getElementById("zotero-ai-summary-button");
+      if (existing) return;
+
+      const toolbar =
+        doc.getElementById("zotero-toolbar-item-tree") ||
+        doc.getElementById("zotero-toolbar-collection-tree") ||
+        doc.querySelector("toolbar");
+      if (!toolbar) return;
+
+      const button = ztoolkit.UI.createElement(doc, "toolbarbutton", {
+        id: "zotero-ai-summary-button",
+        attributes: {
+          label: "AI Summary",
+          tooltiptext: "Summarize abstract with AI",
+          class: "zotero-tb-button",
+          image: "chrome://zotero/skin/16/universal/book.svg",
+        },
+        listeners: [
+          {
+            type: "command",
+            listener: () => {
+              AIModule.summarizeSelectedAbstract();
+            },
+          },
+        ],
+      });
+      (toolbar as any).appendChild(button);
+      ztoolkit.log("AI summary button appended to toolbar");
+    } catch (e) {
+      ztoolkit.log("Error registering summary button:", e);
+    }
+  }
+
+  /**
+   * Summarize abstract of selected item
+   */
+  static async summarizeSelectedAbstract() {
+    try {
+      const PREFS_PREFIX = config.prefsPrefix;
+      const prefix = "[ZoteroAI][Summary]";
+      const log = (msg: string, extra?: any) => {
+        try { Zotero.debug(`${prefix} ${msg}`); } catch (_) {}
+        try { ztoolkit.log(`${prefix} ${msg}`, extra ?? ""); } catch (_) {}
+      };
+
+      const apiKey = (Zotero.Prefs.get(`${PREFS_PREFIX}.openai.apiKey`, true) as string) || "";
+      const model = ((Zotero.Prefs.get(`${PREFS_PREFIX}.openai.model`, true) as string) || "gpt-5").trim();
+
+      const items = AIModule.getSelectedItems();
+      if (!items.length) {
+        log("No selection in item tree");
+        ztoolkit.getGlobal("alert")("Select an item in the middle pane first.");
+        return;
+      }
+      // Prefer first regular item
+      const item = (items.find((i: any) => (i as Zotero.Item).isRegularItem?.()) || items[0]) as Zotero.Item;
+      const itemId = (item as any)?.id;
+      const title = (item.getField("title") as string) || "Untitled";
+      const abstractNote = (item.getField("abstractNote") as string) || "";
+      log(`Selected item id=${itemId} titleChars=${title.length} abstractChars=${abstractNote.length}`);
+      if (!abstractNote) {
+        ztoolkit.getGlobal("alert")("This item has no Abstract field.");
+        return;
+      }
+      if (!apiKey) {
+        log("API key empty");
+        ztoolkit.getGlobal("alert")("OpenAI API key is empty. Open AI Assistant and set the key.");
+        return;
+      }
+
+      const prompt = `Summarize the following scientific abstract in 3-5 concise bullet points. Keep key findings, methods, and implications. If the text is not English, reply in that language.\n\nTitle: ${title}\n\nAbstract:\n${abstractNote}`;
+      log(`Prompt prepared model=${model} totalChars=${prompt.length}`);
+
+      const pw = new ztoolkit.ProgressWindow("Zotero AI Summary", { closeOnClick: false, closeTime: -1 })
+        .createLine({ text: "Preparing request…", type: "default", progress: 20 })
+        .show();
+
+      const reqId = Math.random().toString(16).slice(2, 8);
+      const t0 = Date.now();
+      const onProgress = (m: string) => {
+        Zotero.debug(`${prefix} req=${reqId} ${m}`);
+        pw.changeLine({ text: m.slice(0, 80), progress: 50 });
+      };
+
+      let answer = "";
+      try {
+        answer = await AIModule.askOpenAI(apiKey, model, prompt, onProgress);
+        const dt = Date.now() - t0;
+        log(`Done req=${reqId} in ${dt}ms answerChars=${(answer||"").length}`);
+        pw.changeLine({ text: `Done in ${dt}ms`, progress: 100 });
+        pw.startCloseTimer(800);
+      } catch (e: any) {
+        const dt = Date.now() - t0;
+        log(`ERROR req=${reqId} after ${dt}ms: ${e?.message || e}`);
+        pw.changeLine({ text: `Error: ${e?.message || e}`, type: "error", progress: 100 });
+        pw.startCloseTimer(3000);
+        return;
+      }
+
+      // Show result in a small dialog with copy button
+      const dlgData: any = {
+        loadCallback: () => {
+          try {
+            const win = _globalThis.addon?.data?.dialog?.window || dlg.window;
+            const ddoc = win?.document || dlg.window?.document;
+            // Remove auto Fluent ids if any to avoid missing FTL warnings
+            try {
+              ddoc?.getElementById("copy")?.removeAttribute("data-l10n-id");
+              ddoc?.getElementById("close")?.removeAttribute("data-l10n-id");
+            } catch (_) {}
+            const ta = ddoc?.getElementById("ai-summary-text") as HTMLTextAreaElement | null;
+            if (ta) {
+              ta.value = answer || "<empty response>";
+              try { Zotero.debug(`[ZoteroAI][Summary] textarea set in loadCallback chars=${ta.value.length}`); } catch (_) {}
+            } else {
+              try { Zotero.debug(`[ZoteroAI][Summary] textarea not found in loadCallback`); } catch (_) {}
+              // Fallback: delayed setter
+              try {
+                win?.setTimeout?.(() => {
+                  const late = ddoc?.getElementById("ai-summary-text") as HTMLTextAreaElement | null;
+                  if (late) {
+                    late.value = answer || "<empty response>";
+                    Zotero.debug(`[ZoteroAI][Summary] textarea set by timeout chars=${late.value.length}`);
+                  }
+                }, 50);
+              } catch (_) {}
+            }
+          } catch (err) {
+            try { Zotero.debug(`[ZoteroAI][Summary] loadCallback error: ${String((err as any)?.stack || err)}`); } catch (_) {}
+          }
+        }
+      };
+
+      const dlg = new ztoolkit.Dialog(6, 2)
+        .addCell(0, 0, { tag: "h3", namespace: "html", properties: { innerHTML: "AI Summary" } })
+        .addCell(1, 0, { tag: "label", namespace: "html", properties: { innerHTML: "Title:" } })
+        .addCell(1, 1, { tag: "div", namespace: "html", properties: { innerText: title } })
+        .addCell(2, 0, { tag: "label", namespace: "html", properties: { innerHTML: "Summary:" } })
+        .addCell(2, 1, {
+          tag: "textarea",
+          namespace: "html",
+          id: "ai-summary-text",
+          properties: { rows: 12, readOnly: true },
+          styles: { width: "100%", backgroundColor: "#f7f7f7" },
+        })
+        .addButton("Copy", "copy", {
+          noClose: true,
+          callback: () => {
+            new ztoolkit.Clipboard().addText(answer || "", "text/unicode").copy();
+          },
+        })
+        .addButton("Close", "close")
+        .setDialogData(dlgData)
+        .open("AI Summary", { width: 600, height: 480, centerscreen: true });
+    } catch (e) {
+      try { Zotero.debug(`[ZoteroAI] summarize error: ${String(e)}`); } catch (_) {}
+      ztoolkit.getGlobal("alert")("Failed to summarize. See Debug Output Logging.");
     }
   }
 
