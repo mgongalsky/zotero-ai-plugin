@@ -6,48 +6,60 @@ export class AIModule {
    */
   static registerAIButton() {
     try {
-      // Get the main window document
-      const doc = ztoolkit.getGlobal("window").document;
-      
-      // Create AI toolbar button
-      const button = ztoolkit.UI.createElement(doc, "toolbarbutton", {
-        id: "zotero-ai-toolbar-button",
-        attributes: {
-          class: "zotero-tb-button",
-          tooltiptext: "Zotero AI Assistant",
-          type: "button"
-        },
-        properties: {
-          label: "AI Assistant",
-        },
-        listeners: [
-          {
-            type: "command",
-            listener: () => {
-              this.showAIDialog();
-            }
-          }
-        ],
-        styles: {
-          listStyleImage: `url('chrome://${addon.data.config.addonRef}/content/icons/ai-icon.svg')`,
-        }
-      });
-
-      // Find the main toolbar and add the button
-      const toolbar = doc.getElementById("zotero-toolbar");
-      if (toolbar) {
-        // Add button before the last element (usually sync button)
-        const syncButton = doc.getElementById("zotero-tb-sync");
-        if (syncButton) {
-          toolbar.insertBefore(button, syncButton);
-        } else {
-          toolbar.appendChild(button);
+      ztoolkit.log("Starting AI button registration");
+      // Direct DOM manipulation for reliable toolbar button placement
+      setTimeout(() => {
+        const doc = ztoolkit.getGlobal("window").document;
+        
+        // Debug: let's find all toolbars
+        const allToolbars = doc.querySelectorAll('toolbar');
+        ztoolkit.log(`Found ${allToolbars.length} toolbars:`);
+        allToolbars.forEach((tb, index) => {
+          ztoolkit.log(`Toolbar ${index}: id='${(tb as any).id}', class='${(tb as any).className}'`);
+        });
+        
+        // Prefer the center item tree toolbar, then left collection tree
+        let toolbar = doc.getElementById("zotero-toolbar-item-tree") ||
+                      doc.getElementById("zotero-toolbar-collection-tree") ||
+                      (allToolbars.length ? (allToolbars[0] as Element) : null);
+        
+        const existing = doc.getElementById("zotero-ai-toolbar-button");
+        if (existing) {
+          ztoolkit.log("AI button already exists — skipping creation");
+          return;
         }
         
-        ztoolkit.log("AI toolbar button added successfully");
-      } else {
-        ztoolkit.log("Toolbar not found, cannot add AI button");
-      }
+        if (toolbar) {
+          ztoolkit.log(`Found toolbar with id: ${(toolbar as any).id}`);
+          ztoolkit.log("Adding AI button to toolbar (append)");
+          
+          // Create button using ztoolkit
+          const button = ztoolkit.UI.createElement(doc, "toolbarbutton", {
+            id: "zotero-ai-toolbar-button",
+            attributes: {
+              label: "AI",
+              tooltiptext: "Zotero AI Assistant",
+              class: "zotero-tb-button",
+              image: "chrome://zotero/skin/16/universal/lightbulb.png"
+            },
+            listeners: [
+              {
+                type: "command",
+                listener: () => {
+                  this.showAIDialog();
+                }
+              }
+            ]
+          });
+          
+          ;(toolbar as any).appendChild(button);
+          ztoolkit.log("AI button appended to toolbar successfully");
+          
+        } else {
+          ztoolkit.log("Toolbar still not found after timeout");
+        }
+      }, 1000); // Wait 1 second for UI to load
+      
     } catch (e) {
       ztoolkit.log("Error adding AI toolbar button:", e);
       console.error("AI button registration error:", e);
@@ -206,11 +218,19 @@ export class AIModule {
    */
   static unregisterAIButton() {
     try {
-      const doc = ztoolkit.getGlobal("window").document;
-      const button = doc.getElementById("zotero-ai-toolbar-button");
-      if (button) {
-        button.remove();
-        ztoolkit.log("AI toolbar button removed");
+      ztoolkit.log("Attempting to remove AI button");
+      
+      const doc = ztoolkit.getGlobal("window")?.document;
+      if (doc) {
+        const button = doc.getElementById("zotero-ai-toolbar-button");
+        if (button) {
+          button.remove();
+          ztoolkit.log("AI toolbar button removed successfully");
+        } else {
+          ztoolkit.log("AI button not found for removal");
+        }
+      } else {
+        ztoolkit.log("Document not available for button removal");
       }
     } catch (e) {
       ztoolkit.log("Error removing AI button:", e);

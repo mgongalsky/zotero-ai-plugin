@@ -84,7 +84,9 @@ async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
   PromptExampleFactory.registerConditionalCommandExample();
 
   // Register AI toolbar button
+  ztoolkit.log("About to register AI button from hooks.ts");
   AIModule.registerAIButton();
+  ztoolkit.log("AI button registration called");
 
   await Zotero.Promise.delay(1000);
 
