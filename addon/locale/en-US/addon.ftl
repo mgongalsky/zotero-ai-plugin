@@ -9,3 +9,8 @@ prefs-table-title = Title
 prefs-table-detail = Detail
 tabpanel-lib-tab-label = Lib Tab
 tabpanel-reader-tab-label = Reader Tab
+
+# AI Module
+ai-button-tooltip = Zotero AI Assistant
+ai-dialog-title = Zotero AI Assistant
+ai-welcome-message = Welcome to Zotero AI! Intelligent research features coming soon.
