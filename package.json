@@ -12,13 +12,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/zotero-ai-plugin.git"
+    "url": "git+https://github.com/mgongalsky/zotero-ai-plugin.git"
   },
   "author": "Maxim Gongalsky",
   "bugs": {
-    "url": "https://github.com/yourusername/zotero-ai-plugin/issues"
+    "url": "https://github.com/mgongalsky/zotero-ai-plugin/issues"
   },
-  "homepage": "https://github.com/yourusername/zotero-ai-plugin#readme",
+  "homepage": "https://github.com/mgongalsky/zotero-ai-plugin#readme",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "start": "zotero-plugin serve",

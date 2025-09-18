@@ -34,7 +34,7 @@ An AI-powered plugin for [Zotero](https://www.zotero.org/) that enhances your re
 ## Installation
 
 ### Method 1: Manual Installation
-1. Download the latest `zotero-ai-plugin-v*.xpi` file from [Releases](https://github.com/yourusername/zotero-ai-plugin/releases)
+1. Download the latest `zotero-ai-plugin-v*.xpi` file from [Releases](https://github.com/mgongalsky/zotero-ai-plugin/releases)
 2. In Zotero, go to Tools → Add-ons
 3. Click the gear icon and select "Install Add-on From File"
 4. Select the downloaded `.xpi` file
@@ -57,7 +57,7 @@ This plugin is built using the [Zotero Plugin Template](https://github.com/windi
 ### Setup
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/zotero-ai-plugin.git
+git clone https://github.com/mgongalsky/zotero-ai-plugin.git
 cd zotero-ai-plugin
 
 # Install dependencies
